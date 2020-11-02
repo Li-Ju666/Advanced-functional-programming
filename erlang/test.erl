@@ -1,8 +1,8 @@
 -module(test).
 -export([sort/1]).
 
--include_lib("eunit/include/eunit.hrl").
 -include_lib("proper/include/proper.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 
 sort([]) -> [];
@@ -35,3 +35,24 @@ prop_ordered() ->
 ordered([]) -> true;
 ordered([_]) -> true; 
 ordered([A,B|T]) -> A =< B andalso ordered([B|T]).
+
+prop_length() -> 
+    ?FORALL(L, list(integer()), length(L) =:= length(sort(L))).
+
+prop_no_du() -> 
+    ?FORALL(L, list_no_du(integer()), length(L) =:= length(sort(L))).
+
+% no_duplicates([]) -> true;
+% no_duplicates([A|T]) ->
+%     not lists:member(A, T) andalso no_duplicates(T).
+
+
+list_no_du(T) ->
+    ?LET(L, list(T), remove_duplicates(L)).
+
+remove_duplicates([]) -> [];
+remove_duplicates([A|T]) -> 
+    case lists:member(A,T) of
+        true -> remove_duplicates(T);
+        false -> [A|remove_duplicates(T)]
+    end.
