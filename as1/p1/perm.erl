@@ -74,11 +74,12 @@ generate231(L) ->
 %% Property 2: lists with more than 1,000,000 elements can 
 %% be computed with in one second
 prop_efficiency() -> 
-    ?FORALL(L, integer(), ?IMPLIES(L>0 andalso L<100, time_test(lists:seq(1,L+1000000)))).
+    ?FORALL(L, range(0,1000000), time_test(lists:seq(0,L))).
 
 time_test(L) ->
-    Shuffled = shuffle(L),
-    element(1,timer:tc(perm,perm, [L, Shuffled])) =< 1000000.
+    Shuffled1 = shuffle(L),
+    Shuffled2 = shuffle(L),
+    element(1,timer:tc(perm,perm, [Shuffled1, Shuffled2])) =< 1000000.
 
 %% Helper function to shuffle all elements of the input list
 shuffle(L) -> 
