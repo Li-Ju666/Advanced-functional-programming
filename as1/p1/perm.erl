@@ -3,7 +3,7 @@
 -include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
+-spec perm(list(),list()) -> 'false' | 'true'.
 perm(Input, Output) -> perm(reverse(Input), reverse(Output), []).
 perm([], Output, Stack) -> 
     case Output of 
@@ -20,6 +20,7 @@ perm([I|Is], [O|Os], Stack) ->
 
 
 %% Helper function to reverse a list
+-spec reverse(list()) -> list().
 reverse(List) -> reverse(List, []).
 reverse([], Acc) -> Acc;
 reverse([X|Xs], Acc) -> reverse(Xs, [X|Acc]).
@@ -73,7 +74,7 @@ generate231(L) ->
 %% Property 2: lists with more than 1,000,000 elements can 
 %% be computed with in one second
 prop_efficiency() -> 
-    ?FORALL(L, integer(), ?IMPLIES(L>0, time_test(lists:seq(1,L+1000000)))).
+    ?FORALL(L, integer(), ?IMPLIES(L>0 andalso L<100, time_test(lists:seq(1,L+1000000)))).
 
 time_test(L) ->
     Shuffled = shuffle(L),
