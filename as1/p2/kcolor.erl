@@ -1,5 +1,5 @@
 -module(kcolor).
--export([insertEdge/2, insertVert/2, findAdj/2]).
+-export([random_insert/2, getVerts/1]).
 
 -include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -36,7 +36,34 @@ findAdj(G, V1) ->
         [_|Ns] -> findAdj(Ns, V1)
     end.
 
+-spec getVerts(graph()) -> [term()].
+getVerts(G) -> 
+    case G of
+        [] -> [];
+        [{V,_} | Vs] -> [V]++getVerts(Vs)
+    end.
+
 %% ====================================================================
 %% Property-based testing for graph data structure
 %% ====================================================================
-prop_
+% prop_adj_in_pair() -> 
+%     ?LET(L, random_graph(integer()), in_pair_test(L)).
+
+random_graph(T) -> 
+    ?LET(L, list(T), random_insert([],L)).
+
+random_insert(G, List) -> 
+    case List of
+        [] -> G;
+        [V] -> insertVert(G,V);
+        [V1,V2] -> insertEdge(G,{V1,V2});
+        [V1,V2|Vs] -> case lists:nth(rand:uniform(2),[true,false]) of
+                         true -> random_insert(insertEdge(G, {V1,V2}), Vs);
+                         false -> random_insert(insertVert(G,V1), [V2|Vs])
+                      end
+    end.
+
+% in_pair_test(G) -> 
+%     case G of 
+%         [] -> true;
+%         []
