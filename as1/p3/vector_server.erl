@@ -39,6 +39,7 @@
 %%--------------------------------------------------------------------
 start_link(Port) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [Port], []).
+    % receive normalExit -> start_link(Port) end.
 
 %% @spec start_link() -> {ok, Pid}
 %% @doc Calls `start_link(Port)' using the default port.
@@ -79,7 +80,7 @@ handle_info({tcp, Socket, RawData}, State) ->
     {noreply, State#state{request_count = RequestCount + 1}};
 
 handle_info({tcp_closed, _}, State) ->
-    {stop, normal, State};
+    handle_info(timeout,State#state{request_count = 0}); 
 
 handle_info(timeout, #state{lsock = LSock} = State) ->
     {ok, _Sock} = gen_tcp:accept(LSock),
@@ -118,9 +119,3 @@ args_to_terms(RawArgs) ->
     {ok, Toks, _Line} = erl_scan:string("[" ++ RawArgs ++ "]. ", 1),
     {ok, Args} = erl_parse:parse_term(Toks),
     Args.
-
-
-%% test
-
-start_test() ->
-    {ok, _} = tr_server:start_link(1055).
