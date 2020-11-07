@@ -1,18 +1,10 @@
-%%%-------------------------------------------------------------------
-%%% @author Martin & Eric <erlware-dev@googlegroups.com>
-%%%  [http://www.erlware.org]
-%%% @copyright 2008-2010 Erlware
-%%% @doc RPC over TCP server. This module defines a server process that
-%%%      listens for incoming TCP connections and allows the user to
-%%%      execute RPC commands via that TCP stream.
-%%% @end
-%%%-------------------------------------------------------------------
+%%-------------------------------------------------------------------
+%% @author Li Ju
+%%-------------------------------------------------------------------
 
--module(tr_server).
+-module(vector_server).
 
 -behaviour(gen_server).
-
--include_lib("eunit/include/eunit.hrl").
 
 %% API
 -export([
@@ -53,13 +45,7 @@ start_link(Port) ->
 start_link() ->
     start_link(?DEFAULT_PORT).
 
-%%--------------------------------------------------------------------
-%% @doc Fetches the number of requests made to this server.
-%% @spec get_count() -> {ok, Count}
-%% where
-%%  Count = integer()
-%% @end
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 get_count() ->
     gen_server:call(?SERVER, get_count).
 
@@ -77,6 +63,7 @@ stop() ->
 %%%===================================================================
 
 init([Port]) ->
+    io:format("Initializing"),
     {ok, LSock} = gen_tcp:listen(Port, [{active, true}]),
     {ok, #state{port = Port, lsock = LSock}, 0}.
 
@@ -90,11 +77,16 @@ handle_info({tcp, Socket, RawData}, State) ->
     do_rpc(Socket, RawData),
     RequestCount = State#state.request_count,
     {noreply, State#state{request_count = RequestCount + 1}};
+
+handle_info({tcp_closed, _}, State) ->
+    {stop, normal, State};
+
 handle_info(timeout, #state{lsock = LSock} = State) ->
     {ok, _Sock} = gen_tcp:accept(LSock),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
+    io:format("Terminate function called"), 
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -106,21 +98,21 @@ code_change(_OldVsn, State, _Extra) ->
 
 do_rpc(Socket, RawData) ->
     try
-        {M, F, A} = split_out_mfa(RawData),
-        Result = apply(M, F, A),
-        gen_tcp:send(Socket, io_lib:fwrite("~p~n", [Result]))
+        % io:format(RawData),
+        Result = split_out_mfa(RawData),
+        % Result = Term,
+        gen_tcp:send(Socket, io_lib:fwrite("Res: ~w~n", [Result]))
     catch
         _Class:Err ->
-            gen_tcp:send(Socket, io_lib:fwrite("~p~n", [Err]))
+            gen_tcp:send(Socket, io_lib:fwrite("Res: ~w~n", [Err]))
     end.
 
 split_out_mfa(RawData) ->
-    MFA = re:replace(RawData, "\r\n$", "", [{return, list}]),
-    {match, [M, F, A]} =
-        re:run(MFA,
-               "(.*):(.*)\s*\\((.*)\s*\\)\s*.\s*$",
-                   [{capture, [1,2,3], list}, ungreedy]),
-    {list_to_atom(M), list_to_atom(F), args_to_terms(A)}.
+    {ok, Ts, _} = erl_scan:string(RawData ++ "."),
+    % io:format("Ts generated"), 
+    {ok, Term} = erl_parse:parse_term(Ts),
+    % io:format("Going to return"),
+    Term.
 
 args_to_terms(RawArgs) ->
     {ok, Toks, _Line} = erl_scan:string("[" ++ RawArgs ++ "]. ", 1),
