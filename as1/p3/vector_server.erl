@@ -64,7 +64,7 @@ stop() ->
 %%%===================================================================
 
 init([Port]) ->
-    io:format("Initializing"),
+    % io:format("Initializing"),
     {ok, LSock} = gen_tcp:listen(Port, [{active, true}]),
     {ok, #state{port = Port, lsock = LSock}, 0}.
 
@@ -83,6 +83,7 @@ handle_info({tcp_closed, _}, State) ->
     handle_info(timeout,State#state{request_count = 0}); 
 
 handle_info(timeout, #state{lsock = LSock} = State) ->
+    io:format("Waiting to get connected...~n"),
     {ok, _Sock} = gen_tcp:accept(LSock),
     {noreply, State}.
 
@@ -98,24 +99,68 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 do_rpc(Socket, RawData) ->
-    try
         % io:format(RawData),
-        Result = split_out_mfa(RawData),
-        % Result = Term,
-        gen_tcp:send(Socket, io_lib:fwrite("Res: ~w~n", [Result]))
-    catch
-        _Class:Err ->
-            gen_tcp:send(Socket, io_lib:fwrite("Res: ~w~n", [Err]))
+    case evaluate(RawData) of
+        error -> gen_tcp:send(Socket, io_lib:fwrite("Res: ~w~n", [error]));
+        Result -> gen_tcp:send(Socket, io_lib:fwrite("Res: ~w~n", [Result]))
     end.
 
-split_out_mfa(RawData) ->
+evaluate(RawData) ->
     {ok, Ts, _} = erl_scan:string(RawData ++ "."),
-    % io:format("Ts generated"), 
     {ok, Term} = erl_parse:parse_term(Ts),
-    % io:format("Going to return"),
-    Term.
+    evaluate(Term,0).
 
-args_to_terms(RawArgs) ->
-    {ok, Toks, _Line} = erl_scan:string("[" ++ RawArgs ++ "]. ", 1),
-    {ok, Args} = erl_parse:parse_term(Toks),
-    Args.
+evaluate([], _) -> error;
+evaluate([X|Xs], _) -> 
+    case length([X|Xs])>100 of 
+        true -> error;
+        false -> [X|Xs]
+    end;
+evaluate({Operation, E}, Depth) -> 
+    case Depth>100 of
+        true -> error;
+        false -> 
+            case Operation of 
+                norm_one -> norm_one(evaluate(E, Depth+1));
+                norm_inf -> norm_inf(evaluate(E, Depth+1))
+            end
+    end;
+evaluate({Operation, E1, E2}, Depth) -> 
+    case Depth>100 of
+        true -> error;
+        false -> 
+            % A1 -> evaluate(E1, Depth+1)
+            case Operation of
+                add -> add(evaluate(E1, Depth+1), evaluate(E2, Depth+1));
+                sub -> sub(evaluate(E1, Depth+1), evaluate(E2, Depth+1));
+                dot -> dot(evaluate(E1, Depth+1), evaluate(E2, Depth+1));
+                mul -> mul(evaluate(E1, Depth+1), evaluate(E2, Depth+1));
+                'div' -> divide(evaluate(E1, Depth+1), evaluate(E2, Depth+1))
+             end
+     end;
+%% integer evaluation to be re-writed
+evaluate(Value, _) -> Value.
+
+add(V1, V2) -> 
+    case length(V1) =:= length(V2) of
+        true -> [X1+X2||{X1,X2}<-lists:zip(V1,V2)];
+        false -> error
+    end.
+sub(V1, V2) -> 
+    case length(V1) =:= length(V2) of
+        true -> [X1-X2||{X1,X2}<-lists:zip(V1,V2)];
+        false -> error
+    end.
+dot(V1, V2) -> 
+    case length(V1) =:= length(V2) of
+        true -> [X1*X2||{X1,X2}<-lists:zip(V1,V2)];
+        false -> error
+    end.
+
+mul(A, V) -> [X*A||X<-V].
+
+divide(0, _) -> error;
+divide(A, V) -> [X div A||X<-V].
+
+norm_one(V) -> lists:sum([abs(X)||X<-V]).
+norm_inf(V) -> lists:max([abs(X)||X<-V]).
