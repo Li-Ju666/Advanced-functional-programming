@@ -107,8 +107,10 @@ do_rpc(Socket, RawData) ->
 
 evaluate(RawData) ->
     {ok, Ts, _} = erl_scan:string(RawData ++ "."),
-    {ok, Term} = erl_parse:parse_term(Ts),
-    evaluate(Term,0).
+    case erl_parse:parse_term(Ts) of
+            {ok, Term} -> evaluate(Term, 0);
+            _ -> error
+    end.
 
 evaluate([], _) -> error;
 evaluate([X|Xs], _) -> 
@@ -116,51 +118,83 @@ evaluate([X|Xs], _) ->
         true -> error;
         false -> [X|Xs]
     end;
+
+% evaluate({_, error}, _) -> error;
 evaluate({Operation, E}, Depth) -> 
     case Depth>100 of
         true -> error;
         false -> 
-            case Operation of 
-                norm_one -> norm_one(evaluate(E, Depth+1));
-                norm_inf -> norm_inf(evaluate(E, Depth+1))
-            end
+            Arg = evaluate(E, Depth+1),
+            case Arg of
+                error -> error;
+                Arg -> 
+                    case Operation of
+                        norm_one -> norm_one(Arg);
+                        norm_inf -> norm_inf(Arg)
+                    end
+             end
     end;
+
+% evaluate({_, error, _}, _) -> error;
+% evaluate({_, _, error}, _) -> error;
 evaluate({Operation, E1, E2}, Depth) -> 
     case Depth>100 of
         true -> error;
         false -> 
-            % A1 -> evaluate(E1, Depth+1)
-            case Operation of
-                add -> add(evaluate(E1, Depth+1), evaluate(E2, Depth+1));
-                sub -> sub(evaluate(E1, Depth+1), evaluate(E2, Depth+1));
-                dot -> dot(evaluate(E1, Depth+1), evaluate(E2, Depth+1));
-                mul -> mul(evaluate(E1, Depth+1), evaluate(E2, Depth+1));
-                'div' -> divide(evaluate(E1, Depth+1), evaluate(E2, Depth+1))
+            Arg1 = evaluate(E1, Depth+1),
+            Arg2 = evaluate(E2, Depth+1),
+            case (Arg1 =:= error) or (Arg2 =:= error) of
+                true -> error;
+                false -> 
+                    case Operation of
+                        add -> add(Arg1,Arg2);
+                        sub -> sub(Arg1,Arg2);
+                        dot -> dot(Arg1,Arg2);
+                        mul -> mul(Arg1,Arg2);
+                        'div' -> divide(Arg1,Arg2)
+                    end
              end
      end;
 %% integer evaluation to be re-writed
-evaluate(Value, _) -> Value.
+evaluate(Val, _) -> 
+    case is_integer(Val) of
+        true -> Val;
+        false -> error
+    end.
 
+% add(error, _) -> error;
+% add(_, error) -> error;
 add(V1, V2) -> 
     case length(V1) =:= length(V2) of
         true -> [X1+X2||{X1,X2}<-lists:zip(V1,V2)];
         false -> error
     end.
+
+% sub(error, _) -> error;
+% sub(_, error) -> error;
 sub(V1, V2) -> 
     case length(V1) =:= length(V2) of
         true -> [X1-X2||{X1,X2}<-lists:zip(V1,V2)];
         false -> error
     end.
+
+% dot(error, _) -> error;
+% dot(_, error) -> error;
 dot(V1, V2) -> 
     case length(V1) =:= length(V2) of
         true -> [X1*X2||{X1,X2}<-lists:zip(V1,V2)];
         false -> error
     end.
 
+% mul(error, _) -> error;
+% mul(_, error) -> error;
 mul(A, V) -> [X*A||X<-V].
 
+% divide(_, error) -> error;
 divide(0, _) -> error;
 divide(A, V) -> [X div A||X<-V].
 
+% norm_one(error) -> error;
 norm_one(V) -> lists:sum([abs(X)||X<-V]).
+% norm_inf(error) -> error;
 norm_inf(V) -> lists:max([abs(X)||X<-V]).
