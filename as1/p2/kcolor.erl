@@ -1,17 +1,22 @@
 -module(kcolor).
--export([newGraph/0, insertEdge/2, insertVert/2, kcolor/2]).
-% -compile(export_all).
+-export([new_graph/0, add_edge/2, add_vertex/2, kcolor/2]).
 -include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--type vert() :: {term(), [term()]}.
--type graph() :: [vert()].
+-type vert() :: term().
+-type edge() :: {vert(), vert()}.
+-type graph() :: [{vert(), [vert()]}].
+
+new_graph() -> newGraph().
+add_edge(A, B) -> insertEdge(A, B).
+add_vertex(A, B) -> insertVert(A, B).
+
 
 %% to generate an empty graph
 newGraph() -> [].
 
 %% to insert an edge specified by {V1, V2} to graph G
--spec insertEdge(graph(), vert()) -> graph().
+-spec insertEdge(graph(), edge()) -> graph().
 insertEdge(G, {V1, V2}) ->
         case V1 =:= V2 of 
             true -> insertVert(G,V1);
@@ -117,67 +122,84 @@ edge_vert_test(G) ->
 %% ======================================================================
 %% kcolor algorithm implementation
 
-kcolor([], _) -> [];
-kcolor(G, Num) -> 
-    Colored = lists:sort(colorGraph(G, [])),
-    NumOfColor = length(lists:usort(
-                   lists:foldr(fun({_, C}, Acc) -> [C|Acc] end, [], Colored))),
-    case NumOfColor =< Num of
-        true -> Colored;
-        false -> false
+getColors(Num) -> 
+    AllColors = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z], 
+    AllColors -- lists:nthtail(Num, AllColors).
+
+kcolor(G, Num) -> kcolor(G, G, [], getColors(Num)).
+
+kcolor(_, [], Colored, _) -> Colored;
+kcolor(G, [{V, _}|Vs], Colored, Colors) ->
+    ValidColoring = [[{V, X}|Colored] || X<-Colors, isValid(G, Colored, {V,X})],
+    case ValidColoring of 
+        [] -> false;
+        [Coloring1|Others] -> 
+            FirstColoring = kcolor(G, Vs, Coloring1, Colors),
+            case FirstColoring of
+                false -> case Others of 
+                             [] -> false;
+                             _ -> kcolor(G, Vs, lists:nth(1, Others), Colors)
+                         end; 
+                _ -> lists:sort(FirstColoring)
+            end
     end.
 
-%% Color the graph with least number of colors
-colorGraph([], Colored) -> Colored;
-colorGraph([{V1,Edges}|Vs], Colored) -> 
-    Adjs = getAdj([{V1,Edges}|Vs],V1),
-    AdjColors = getAdjColors(Colored, Adjs),
-    AllColors = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z],
-    colorGraph(Vs,[{V1,lists:min(AllColors--AdjColors)}|Colored]).
+isValid(G, Colored, {V, Color}) -> 
+   Adjs = getAdj(G, V), 
+   lists:foldr(fun(X, Acc) -> 
+            case getColor(X, Colored) =/= Color of 
+               true -> true andalso Acc; 
+               false -> false
+            end
+         end, true, Adjs).
 
-%% get colors of a list of vertices
-getAdjColors([], _) -> [];
-getAdjColors(_, []) -> [];
-getAdjColors(Colored, [V|Vs]) -> 
-    getVertColor(Colored, V) ++ getAdjColors(Colored, Vs).
-
-%% get color of a vertex
-getVertColor([], _) -> [];
-getVertColor([{V1,Color}|Vs], V) ->
-    case V1 =:= V of
-          true -> [Color];
-          false -> getVertColor(Vs, V)
+getColor(_, []) -> null;
+getColor(V, [{V1, Color}|Vs]) -> 
+    case V =:= V1 of 
+        true -> Color;
+        false -> getColor(V, Vs)
     end.
 
 %% ====================================================================
-%% Property-based testing for kcolor implementation 
+%% Property-based testing for kcolor implementation: 1
 %% ====================================================================
-%% test to check if two vertices connected by each edge are of different
-%% colors
+%% test to check if the length of returned colors equals the number of
+%% vertices
+prop_color_length() -> 
+    ?FORALL(L, random_graph(integer()), color_length_test(L)).
+
+color_length_test([]) -> true;
+color_length_test(G) ->
+    Num = rand:uniform(26), 
+    Colored = kcolor(G, Num),
+    case Colored of 
+       false -> true;
+       _ -> length(Colored) =:= length(G)
+    end.
+%% ====================================================================
+%% Property-based testing for kcolor implementation: 2
+%% ====================================================================
+%% test to check if the length of returned colors equals the number of
+%% vertices
+
 prop_adj_color() -> 
     ?FORALL(L, random_graph(integer()), adj_color_test(L)).
 
 adj_color_test([]) -> true;
-adj_color_test(G) ->
-    Colored = kcolor(G, rand:uniform(26)),
-    case Colored of 
-       false -> true;
-       Colors -> 
-            Edges = getEdges(G),
-            CheckList = [checkColor(V1,V2,Colors)||{V1,V2}<-Edges],
-            lists:foldr(
-              fun(X,Acc) -> case X of true -> 1+Acc; _ -> Acc end end, 
-              0, CheckList) =:= length(CheckList)
-     end.
+adj_color_test(G) -> 
+    Num = rand:uniform(26), 
+    % io:format("~p", [G]),
+    % io:format("~p~n", [Num]),
+    Colored = kcolor(G, Num), 
+    case Colored of
+        false -> true;
+        _ -> checkEdges(getEdges(G), Colored)
+    end.
 
-%% Check two vertices are of different colors
-checkColor(V1, V2, Colors) -> 
-    getColor(V1, Colors) =/= getColor(V2, Colors).
-
-%% to get color of a vertex
-getColor(_, []) -> false;
-getColor(V, Colors) -> 
-    case Colors of
-        [{V1, Color}|_] when V1 =:= V -> Color;
-        [_|Cs] -> getColor(V, Cs)
+checkEdges([], _) -> true;
+checkEdges(_, []) -> false;
+checkEdges([{V1, V2}|Es], Colored) -> 
+    case getColor(V1, Colored) =:= getColor(V2, Colored) of
+        true -> false;
+        false -> checkEdges(Es, Colored)
     end.

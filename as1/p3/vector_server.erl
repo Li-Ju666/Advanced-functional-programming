@@ -7,16 +7,14 @@
 -behaviour(gen_server).
 
 %% API
--export([
-         start_link/1,
-         start_link/0,
-         get_count/0,
-         stop/0
-         ]).
+-export([start_link/1, start_link/0, get_count/0, stop/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
+
+% -include_lib("proper/include/proper.hrl").
+% -include_lib("eunit/include/eunit.hrl").
 
 -define(SERVER, ?MODULE).
 -define(DEFAULT_PORT, 1055).
@@ -108,93 +106,99 @@ do_rpc(Socket, RawData) ->
 evaluate(RawData) ->
     {ok, Ts, _} = erl_scan:string(RawData ++ "."),
     case erl_parse:parse_term(Ts) of
-            {ok, Term} -> evaluate(Term, 0);
+            {ok, Term} -> try evaluate(Term, 0) of 
+                              Result -> Result
+                          catch
+                              _:_ -> error
+                          end;
             _ -> error
     end.
 
-evaluate([], _) -> error;
+%% evaluate single vector
+evaluate([], _) -> throw(empty_list);
 evaluate([X|Xs], _) -> 
     case length([X|Xs])>100 of 
-        true -> error;
+        true -> throw(too_long_list);
         false -> [X|Xs]
     end;
 
-% evaluate({_, error}, _) -> error;
+%% evaluate norm operation
 evaluate({Operation, E}, Depth) -> 
     case Depth>100 of
-        true -> error;
+        true -> throw(too_deep_expression);
         false -> 
             Arg = evaluate(E, Depth+1),
-            case Arg of
-                error -> error;
-                Arg -> 
-                    case Operation of
-                        norm_one -> norm_one(Arg);
-                        norm_inf -> norm_inf(Arg)
-                    end
-             end
+            case Operation of
+                norm_one -> norm_one(Arg);
+                norm_inf -> norm_inf(Arg)
+            end
+             % end
     end;
 
-% evaluate({_, error, _}, _) -> error;
-% evaluate({_, _, error}, _) -> error;
+%% evaluate vector and scalar operation
 evaluate({Operation, E1, E2}, Depth) -> 
     case Depth>100 of
-        true -> error;
+        true -> throw(too_deep_expression);
         false -> 
             Arg1 = evaluate(E1, Depth+1),
             Arg2 = evaluate(E2, Depth+1),
-            case (Arg1 =:= error) or (Arg2 =:= error) of
-                true -> error;
-                false -> 
-                    case Operation of
-                        add -> add(Arg1,Arg2);
-                        sub -> sub(Arg1,Arg2);
-                        dot -> dot(Arg1,Arg2);
-                        mul -> mul(Arg1,Arg2);
-                        'div' -> divide(Arg1,Arg2)
-                    end
-             end
+            case Operation of
+                add -> add(Arg1,Arg2);
+                sub -> sub(Arg1,Arg2);
+                dot -> dot(Arg1,Arg2);
+                mul -> mul(Arg1,Arg2);
+                'div' -> divide(Arg1,Arg2)
+            end
      end;
-%% integer evaluation to be re-writed
+
+%% evaluate scalar 
 evaluate(Val, _) -> 
     case is_integer(Val) of
         true -> Val;
-        false -> error
+        false -> throw(badarg)
     end.
 
-% add(error, _) -> error;
-% add(_, error) -> error;
+% vector operations ==============================
 add(V1, V2) -> 
     case length(V1) =:= length(V2) of
         true -> [X1+X2||{X1,X2}<-lists:zip(V1,V2)];
-        false -> error
+        false -> throw(different_length) 
     end.
 
-% sub(error, _) -> error;
-% sub(_, error) -> error;
 sub(V1, V2) -> 
     case length(V1) =:= length(V2) of
         true -> [X1-X2||{X1,X2}<-lists:zip(V1,V2)];
-        false -> error
+        false -> throw(different_length) 
     end.
 
-% dot(error, _) -> error;
-% dot(_, error) -> error;
 dot(V1, V2) -> 
     case length(V1) =:= length(V2) of
         true -> [X1*X2||{X1,X2}<-lists:zip(V1,V2)];
-        false -> error
+        false -> throw(different_length) 
     end.
 
-% mul(error, _) -> error;
-% mul(_, error) -> error;
+%% scalar operations =============================
 mul(A, V) -> [X*A||X<-V].
 
-% divide(_, error) -> error;
-divide(0, _) -> error;
+divide(0, _) -> throw(badarg);
 divide(A, V) -> [X div A||X<-V].
 
-% norm_one(error) -> error;
+%% norm operations ==============================
 norm_one(V) -> lists:sum([abs(X)||X<-V]).
-% norm_inf(error) -> error;
 norm_inf(V) -> lists:max([abs(X)||X<-V]).
+
+% %% =============== test functions =============================
+% %% property-based testing for evaluate function  ==============
+% %% ============================================================
+% generate_n_exp(0) -> {add, [0], [0]};
+% generate_n_exp(N) -> {add, [1], generate_n_exp(N-1)}.
+
+% prop_depth_test() -> 
+%     ?FORALL(L, non_neg_integer(), evaluate_test(
+%                                     lists:flatten(io_lib:format("~p", [generate_n_exp(L)])), L)).
+
+% evaluate_test(Exp, Depth) -> 
+%     case Depth > 100 of
+%         true -> evaluate(Exp) =:= error;
+%         false -> evaluate(Exp) =:= [Depth]
+%     end.
