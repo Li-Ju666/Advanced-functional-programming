@@ -44,5 +44,8 @@ generate231 (x1:x2:x3:xs) = mid:max:min:xs
 prop_eff x = (x>0 and x<1000000) ==> eff_test [x,x-1..0]
     where types = x::Int
 
--- eff_test xs = 
-
+eff_test :: [Int] -> Bool
+eff_test xs = do
+    xs1 <- shuffle xs
+    xs2 <- shuffle xs
+    
