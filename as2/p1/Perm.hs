@@ -39,13 +39,6 @@ generate231 :: [Int] -> [Int]
 generate231 (x1:x2:x3:xs) = mid:max:min:xs
     where [min, mid, max] = sort [x1, x2, x3]
 
--- Property 2: lists with less than 1,000,000 elements can 
--- be computed with in one second
-prop_eff x = (x>0 and x<1000000) ==> eff_test [x,x-1..0]
-    where types = x::Int
-
-eff_test :: [Int] -> Bool
-eff_test xs = do
-    xs1 <- shuffle xs
-    xs2 <- shuffle xs
-    
+-- Property 2: a list should be always stack permutable with
+-- itself 
+prop_self x = perm [0..abs x] [0..abs x]

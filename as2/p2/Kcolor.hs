@@ -45,7 +45,27 @@ getVerts g =
         (v,_):vs -> v:(getVerts vs)
 
 getEdges :: Graph -> [Edge]
-getEdges g = getEdgesD g []
+getEdges g = getEdgesAcc g []
 
-getEdgesD [] acc = acc
-getEdgesD ((v,adj):vs) acc = getEdgesD vs [(v,x)|x<-adj]
+getEdgesAcc [] acc = acc
+getEdgesAcc ((v,adj):vs) acc = getEdgesAcc vs [(v,x)|x<-adj]
+
+-- Property-based test for graph data structure
+-- 1. pairwise adjacent vertex testing
+
+prop_pairwise_adj l = 
+    forAll (randomGraph (length l) l newGraph) $ pairwiseTest
+
+randomGraph :: Int -> [Int] -> Graph -> Gen Graph
+randomGraph n l g = do
+        v1 <- elements l
+        v2 <- elements l
+        if n > 2 then randomGraph (n-1) l (insertEdge g (v1,v2))
+                 else return g
+
+pairwiseTest g = 
+    case getVerts g of
+        [] -> True
+        (v1:_) -> case getAdj g v1 of
+                    [] -> True
+                    (v2:_) -> elem v1 (getAdj g v2)
