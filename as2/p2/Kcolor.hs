@@ -113,3 +113,36 @@ isValid g colors =
             else acc
         vertColor v1 ((v2,c):vs) = if v1 == v2 then c else vertColor v1 vs
 
+-- property-based testing for kcolor implementation
+-- 1. test to check if the length of returned colors equals
+-- the number of all vertices
+prop_colorLength l = 
+    forAll (randomGraphWithNum (length l) l newGraph) $ colorLenTest 
+
+randomGraphWithNum len l g = do
+    graph <- randomGraph (2*len) l g
+    num <- elements [0..(div len 2)]
+    return (graph, num)
+
+-- colorLenTest _ = True
+colorLenTest ([], _) = True
+colorLenTest (g, n) = 
+    case kcolor g n of
+        Just colored -> (length colored) == (length g)
+        _ -> True
+
+-- property-based testing for kcolor implementation
+-- 2. to check if adjacent vertices are of different color 
+prop_adjColor l = 
+    forAll (randomGraphWithNum (length l) l newGraph) $ adjTest
+
+adjTest ([],_) = True
+adjTest (g, n) =
+    case kcolor g n of
+        Just colored -> foldl 
+            (\acc (v1,v2) -> 
+                if acc == False then acc
+                else (vertColor v1 colored) /= (vertColor v2 colored))
+                True (getEdges g) 
+        _ -> True
+    where vertColor v1 ((v2,c):vs) = if v1 == v2 then c else vertColor v1 vs
