@@ -87,30 +87,33 @@ edgeVertTest g =
 -- Kcolor problem: implementation of brute-force algorithm
 type Color = (Vert, Char)
 kcolor :: Graph -> Int -> Maybe [Color]
-kcolor g num = solve g g (Just []) (getColors num)
+kcolor g num = solve g (getColors num)
 
-solve g [] colored _ = do
-    allColors <- colored
-    if isValid g allColors then Just (sort allColors) else Nothing
-solve g ((v,_):vs) colored colors = do
-    allColored <- colored
-    curColor <- return [(v,x):allColored|x<-colors]
-    foldl (\acc x -> 
-        if acc == Nothing then solve g vs (Just x) colors 
-                          else acc) Nothing curColor
+solve g colors = do
+    let resultList = take 1 [x | x<- (getCombs g colors), isValid (getEdges g) x]
+    case resultList of
+        [] -> Nothing
+        x:xs -> Just x
+
+getCombs :: Graph -> [Char] -> [[Color]]
+getCombs [] _ = []
+getCombs _ [] = []
+getCombs g colors = 
+    foldl (\acc a -> [x:y|x<-a, y<-acc]) [[]] vertColor
+    where 
+        vertColor = foldl (\acc c -> [(c,x)|x<-colors]:acc) [] vs
+        vs = getVerts g
 
 getColors :: Int -> [Char]
 getColors n = take n ['a'..'z']
 
-isValid :: Graph -> [Color] -> Bool
-isValid g [] = False
-isValid g colors = 
-    foldl checkColor True edges
+isValid :: [Edge] -> [Color] -> Bool
+isValid [] _ = True
+isValid _ [] = False
+isValid ((v1,v2):vs) colors = 
+    if vertColor v1 colors == vertColor v2 colors
+        then False else isValid vs colors
     where
-        edges = getEdges g
-        checkColor acc (v1,v2) = 
-            if acc then vertColor v1 colors /= vertColor v2 colors
-            else acc
         vertColor v1 ((v2,c):vs) = if v1 == v2 then c else vertColor v1 vs
 
 -- property-based testing for kcolor implementation
