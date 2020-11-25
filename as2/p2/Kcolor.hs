@@ -1,4 +1,5 @@
-module Kcolor where
+module Kcolor(newGraph, insertEdge, insertVert, 
+getAdj, getVerts, getEdges, kcolor) where
 
 import Test.QuickCheck
 import Data.List(nub, sort)

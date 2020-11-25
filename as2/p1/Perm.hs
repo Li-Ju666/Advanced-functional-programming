@@ -42,3 +42,9 @@ generate231 (x1:x2:x3:xs) = mid:max:min:xs
 -- Property 2: a list should be always stack permutable with
 -- itself 
 prop_self x = perm [0..abs x] [0..abs x]
+
+-- Property 3: computation for list with length less than 1,000,000 
+-- should be finished within 1 second
+prop_eff x = within 1000000 $ effTest (nub x) 
+
+effTest x = if length x > 1000000 then True else perm x (reverse x)

@@ -77,10 +77,8 @@ main = do
 
     let result :: DocSet  -- set of docs containing the words in the term
         result = runEval $ parSearch index (B.words s)
-
         -- map the result back to filenames
         files = map (arr !) (Set.toList result)
-
     putStrLn ("\n" ++ unlines files)
 
 parSearch :: DocIndex -> [B.ByteString] -> Eval DocSet
@@ -91,6 +89,7 @@ parSearch index target = do
     rseq as'
     rseq bs'
     return (union as' bs')
+    -- return bs'
 
 split2 :: DocIndex -> (DocIndex, DocIndex)
 split2 a = (Map.fromList i1, Map.fromList i2) 
