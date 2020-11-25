@@ -19,6 +19,7 @@ import Control.Monad
 
 import Control.Parallel.Strategies
 import Control.DeepSeq(force)
+import Control.Concurrent(threadDelay)
 -- A document index and search program.  Use it like this:
 --
 -- $ ./index docs/*
@@ -75,24 +76,27 @@ main = do
     s <- B.getLine
     putStr "wait... "
 
-    let result :: DocSet  -- set of docs containing the words in the term
-        result = runEval $ parSearch index (B.words s)
+    let result :: [DocSet]  -- set of docs containing the words in the term
+        -- result = search index (B.words s)
+        result = runEval (pMap (\x -> search x (B.words s)) indices)
+        results = foldl (\acc x -> acc++(Set.toList x)) [] result
         -- map the result back to filenames
-        files = map (arr !) (Set.toList result)
+        files = map (arr !) results
+ 
     putStrLn ("\n" ++ unlines files)
 
-parSearch :: DocIndex -> [B.ByteString] -> Eval DocSet
-parSearch index target = do
-    let (i1, i2) = split2 index
-    as' <- rpar $ force (search i1 target)
-    bs' <- rpar $ force (search i2 target)
-    rseq as'
-    rseq bs'
-    return (union as' bs')
+-- parSearch :: DocIndex -> [B.ByteString] -> Eval DocSet
+-- parSearch index target = do
+--     let (i1, i2) = split2 index
+--     as' <- rpar (force (search i1 target))
+--     bs' <- rpar (force (search i2 target))
+--     rseq as'
+--     rseq bs'
+--     return (union as' bs')
     -- return bs'
-
-split2 :: DocIndex -> (DocIndex, DocIndex)
-split2 a = (Map.fromList i1, Map.fromList i2) 
-    where l = Map.toList a
-          (i1,i2) = splitAt (length l `div` 2) l
-
+pMap :: (a -> b) -> [a] -> Eval [b]
+pMap f [] = return []
+pMap f (a:as) = do
+   b <- rpar (f a)
+   bs <- pMap f as
+   return (b:bs)
