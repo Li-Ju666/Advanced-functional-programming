@@ -1,5 +1,4 @@
-module Kcolor(newGraph, insertEdge, insertVert, 
-getAdj, getVerts, getEdges, kcolor) where
+module Kcolor where
 
 import Test.QuickCheck
 import Data.List(nub, sort)
@@ -128,7 +127,6 @@ randomGraphWithNum len l g = do
     num <- elements [0..(div len 2)]
     return (graph, num)
 
--- colorLenTest _ = True
 colorLenTest ([], _) = True
 colorLenTest (g, n) = 
     case kcolor g n of
