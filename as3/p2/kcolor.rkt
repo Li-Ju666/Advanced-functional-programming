@@ -55,7 +55,7 @@
 
 (define (kcolora og g colored colors)
     (match g
-        ['() colored]
+        ['() (sort colored color-order?)]
         [(cons v1 vs)
            (let ([valid-coloring
                     (for/list ([x colors] #:when (is-valid og colored (list (first v1) x)))
@@ -77,3 +77,28 @@
         ['() 'null]
         [(cons c1 cs) #:when (eq? (first c1) v) (second c1)]
         [(cons c1 cs) (get-color v cs)]))
+
+(define (color-order? c1 c2) (if (< (first c1) (first c2)) #t #f))
+
+;; Unit tests
+; graph with 3 vertices
+(check-equal? (kcolor '((1 (2 3)) (2 (1 3)) (3 (1 2))) 3) '((1 a) (2 b) (3 c)) "check with 3 vertices")
+(check-equal? (kcolor '((1 (2 3)) (2 (1 3)) (3 (1 2))) 2) #f "check with 3 vertices")
+
+; graph with 4 vertices
+(check-equal? (kcolor '((1 (2 3 4)) (2 (1 3)) (3 (1 2)) (4 (1))) 3)
+              '((1 a) (2 b) (3 c) (4 b)) "check with 4 vertices")
+(check-equal? (kcolor '((1 (2 3 4)) (2 (1 3)) (3 (1 2 4)) (4 (1 3))) 3)
+              '((1 a) (2 b) (3 c) (4 b)) "check with 4 vertices")
+(check-equal? (kcolor '((1 (2 3 4)) (2 (1 3 4)) (3 (1 2 4)) (4 (1 3 2))) 3)
+              #f "check with 4 vertices")
+(check-equal? (kcolor '((1 (2 3 4)) (2 (1 3 4)) (3 (1 2 4)) (4 (1 3 2))) 4)
+              '((1 a) (2 b) (3 c) (4 d)) "check with 4 vertices")
+
+; graph with 5 vertices
+(check-equal? (kcolor '((1 (3 5)) (2 (4 5)) (3 (1 4)) (4 (2 3)) (5 (1 2))) 3)
+              '((1 a) (2 a) (3 b) (4 c) (5 b)) "check with 5 vertices")
+(check-equal? (kcolor '((1 (2 3)) (2 (1 4 5)) (3 (1 4 5)) (4 (2 3 5)) (5 (2 3 4))) 3)
+              '((1 a) (2 b) (3 b) (4 a) (5 c)) "check with 5 vertices")
+(check-equal? (kcolor '((1 (2 3)) (2 (1 4 5)) (3 (1 4 5)) (4 (2 3 5)) (5 (2 3 4))) 2)
+              #f "check with 5 vertices")

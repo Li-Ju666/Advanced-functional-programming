@@ -1,7 +1,0 @@
-#lang racket
-
-(define (reverse L) 
-    
-
-; (define (perm L1 L2) 
-;     (perms (reverse L1) (reverse L2) (cons null)))
