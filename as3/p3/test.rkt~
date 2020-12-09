@@ -1,0 +1,3 @@
+#lang racket
+(provide (contract-out (fact (-> natural-number/c natural-number/c))))
+(define (fact x) (if (= x 0) 1 (* x (fact (sub1 x)))))
