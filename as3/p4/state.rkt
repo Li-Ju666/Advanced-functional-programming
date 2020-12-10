@@ -2,10 +2,19 @@
 (provide (all-defined-out))
 
 
-(define (return x) (lambda (s) (list x s)))
+(define (return x)
+    (lambda (s) (list x s)))
+
 (define (get s) (list s s))
-(define (put x) (lambda (s) (list '() x)))
-(define (evalState act) (lambda (s) (first (act s))))
+
+(define (put x)
+    (lambda (s) (list '() x)))
+
+(define (runState state) state)
+
+(define (evalState act)
+    (lambda (s) (first (act s))))
+
 (define (>>= act1 fact2)
     (lambda (s)
         (let ([intermed (act1 s)])
@@ -13,17 +22,11 @@
 
 (define-syntax do
   (syntax-rules (<-)
-    [(_ mexp) mexp]
-    [(_ #:let [pat exp] rest ...)
-     (match-let ((pat exp)) (do rest ...))]
-    [(_ pat <- mexp rest ...)
-     (>>= mexp (match-lambda
-                 [pat (do rest ...)]
-                 [_ 'void]))]
-    [(_ #:guard exp rest ...)
-     (if exp (do rest ...) 'void)]
-    [(_ mexp rest ...)
-     (>>= mexp (lambda (ignored) (do rest ...)))]))
+    [(do exp) exp]
+    [(do value <- exp rest ...)
+       (>>= exp (lambda (value) (do rest ...)))]
+    [(do exp rest ...)
+       (>>= exp (lambda (x) (do rest ...)))]))
 
 ;(define t '("this" ("relabel" () ()) ("tree" ("binary" () ()) ())))
 ;(define (relabel x)
