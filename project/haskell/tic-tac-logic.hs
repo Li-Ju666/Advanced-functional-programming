@@ -20,13 +20,12 @@ main = do
 -- Solve function: apply multiple board-wise rules
 solve :: [[Char]] -> Maybe [[Char]]
 solve board = 
-    if newEmpts == 0
+    if filledBoard result
         then (if solved result then Just result else Nothing) 
         else (if board==result then guess result else solve result)
     where 
         result = avoidDupLine $ 
             lineRules board
-        newEmpts = unfilledBoard result 
                 -- avoidDupLine $ 
                 -- completeLine $ avoidTri2 $ avoidTri1 board
 
@@ -50,21 +49,23 @@ guess board =
 
 ---------------- helper functions for board ----------------------
 -- to check if the board has been filled
+filledBoard :: [[Char]] -> Bool
+filledBoard board = not $ any (True==) (map (any ('.'==)) board)
+
 unfilledBoard :: [[Char]] -> Int
 unfilledBoard board = sum $ map unfilledLine board
 
 -- to check if the board is a valid solution
 solved :: [[Char]] -> Bool
 solved rowBoard = 
-    and (--filledBoard rowBoard:
-        (length rowBoard == length (nub rowBoard)): -- no duplicate row
-        (length colBoard == length (nub colBoard)): -- no duplicate col
-        (map halfSymbol rowBoard)++ -- even symbol in each row 
-        (map halfSymbol colBoard)++ -- even symbol in each col
-        (map noTriInline rowBoard)++ -- no triple symbol in each row
-        (map noTriInline colBoard)) -- no triple symbol in each col
+    and [--filledBoard rowBoard:
+        length rowBoard == length (nub rowBoard), -- no duplicate row
+        length colBoard == length (nub colBoard), -- no duplicate col
+        and $ map lineCheck rowBoard, -- even symbol in each row 
+        and $ map lineCheck colBoard]  -- even symbol in each col
     where
         colBoard = transpose rowBoard
+        lineCheck = \line -> halfSymbol line && noTriInline line
 
 -------------------- helper functions for each line ----------------
 -- helper function to check if a line is filled or not
@@ -114,32 +115,38 @@ lineRules board = rowColMap ((rule3 board).rule4.rule2.rule1) board
 rcsLineApply :: [([Char] -> [Char])] -> [Char] -> [Char]
 rcsLineApply rules line = 
     if line == result then result else rcsLineApply rules result
-    where result = foldl (\acc rule -> rule acc) line rules
+    where result = (foldl (\acc rule -> acc.rule) id rules) line
 
 
 -- rule 1: avoid triple 1 on each line
 rule1 ::[Char] -> [Char]
-rule1 l = (reverse.rule1d.reverse.rule1d) l
+-- rule1 l = (reverse.rule1d.reverse.rule1d) l
+-- rule1 l = rule1d l
 
-rule1d :: [Char] -> [Char]
-rule1d ('X':'X':'.':xs) = "XX" ++ rule1d ('O':xs)
-rule1d ('O':'O':'.':xs) = "OO" ++ rule1d ('X':xs)
+-- rule1 :: [Char] -> [Char]
+rule1 ('X':'X':'.':xs) = "XX" ++ rule1 ('O':xs)
+rule1 ('O':'O':'.':xs) = "OO" ++ rule1 ('X':xs)
+rule1 ('.':'X':'X':xs) = 'O':rule1 ("XX"++xs)
+rule1 ('.':'O':'O':xs) = 'X':rule1 ("OO"++xs)
 -- rule1d (x1:x2:x3:xs) = 
 --     if (and [x1==x2, x1/='.'])
 --         then x1:x2:(rule1d ((opo x1):xs))
 --         else x1:(rule1d (x2:x3:xs))
-rule1d (x:xs) = x:rule1d xs
-rule1d [] = []
+rule1 (x:xs) = x:rule1 xs
+rule1 [] = []
 
 -- rule 2: avoid triple 2 on each line 
 rule2 :: [Char] -> [Char]
-rule2 (x1:x2:x3:xs) = 
-    if (and [x1==x3, x2=='.', x1/='.'])
-        then x1:(opo x1):(rule2 (x3:xs))
-        else x1:(rule2 (x2:x3:xs))
-rule2 xs = xs
+-- rule2 (x1:x2:x3:xs) = 
+--     if (and [x1==x3, x2=='.', x1/='.'])
+--         then x1:(opo x1):(rule2 (x3:xs))
+--         else x1:(rule2 (x2:x3:xs))
+rule2 ('X':'.':'X':xs) = "XO"++rule2 ('X':xs)
+rule2 ('O':'.':'O':xs) = "OX"++rule2 ('O':xs)
+rule2 (x:xs) = x:rule2 xs
+rule2 [] = []
 
--- rule 3: avoid triple 3 on each line 
+-- rule 3: avoid triple 3 and duplicate line in board on each line 
 rule3 :: [[Char]] -> [Char] -> [Char]
 rule3 board line = -- filter checkLine allPoss 
     case lastOne of
@@ -149,28 +156,30 @@ rule3 board line = -- filter checkLine allPoss
             [invalid] -> dotRep (map 
                 (\x->if x=='.' then x else opo x) invalid) line
     where
-        lastOne = if (2*(1 + (length$filter ('X'==) line)) == length line) 
+        lastOne = 
+            if (occurance 'X' line + 1)==(length line `div` 2)
             then 'X'
-            else if (2*(1 + (length$filter ('O'==) line)) == length line)
+            else if (occurance 'O' line + 1)==(length line `div` 2)
                 then 'O'
                 else '.'
+        occurance x = length.(filter (x==))
         empties = unfilledLine line
         allPoss = map (\x -> 
             (take x $ repeat '.') ++ [lastOne]) [0..empties-1]
         checkLine = \poss -> 
-            (invalidLine.(rcsLineApply [rule1, rule2, rule4])) $ 
+            (invalidLine.(rcsLineApply [rule4])) $ 
                 dotRep poss line
-        invalidLine = \line -> not (noTriInline line && halfSymbol line) ||
-            (filledLine line && elem line board)
+        invalidLine = \line -> not (noTriInline line) ||
+            (elem line board)
 
 
 -- rule 4: complete line
 rule4 :: [Char] -> [Char]
 rule4 line
-    | length line == 2*length (filter ((==) 'X') line) =
-        map (\x -> if x=='.' then 'O' else x) line
-    | length line == 2*length (filter ((==) 'O') line) =
-        map (\x -> if x=='.' then 'X' else x) line
+    | length line == 2*length (filter ('X'==)  line) =
+        dotRep (repeat 'O') line 
+    | length line == 2*length (filter ('O'==) line) =
+        dotRep (repeat 'X') line
     | otherwise = line
 
 
