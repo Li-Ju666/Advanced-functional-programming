@@ -1,5 +1,6 @@
 import Data.Char
 import Data.List
+import Test.QuickCheck
 
 main = do
     allContents <- getContents
@@ -18,7 +19,8 @@ solve board =
         then (if solved result then result else []) 
         else (if board==result then guess result else solve result)
     where result = 
-                avoidDupLine $ lineToBoard board
+                avoidDupLine $ 
+                lineToBoard board
                 -- avoidDupLine $ 
                 -- completeLine $ avoidTri2 $ avoidTri1 board
 
@@ -98,7 +100,7 @@ rowColMap tech rowBoard = transpose colResult
 -- applier functions: 
 -- 1). apply all line-wise rules for the board once
 lineToBoard :: [[Char]] -> [[Char]]
-lineToBoard board = rowColMap (rule4.rule3.rule2.rule1) board
+lineToBoard board = rowColMap (rule3.rule4.rule2.rule1) board
 
 -- 2). recursively apply all rules to a line till convergence
 rcsLineApply :: [Char] -> [Char]
@@ -130,20 +132,20 @@ rule2 others = others
 rule3 :: [Char] -> [Char]
 rule3 line =
     case unfilledInline line of
-        3 -> case [noTriInline $ rule4 repFst, 
-                    noTriInline $ rule4 repLst] of 
+        3 -> case [ validLine $ rcsLineApply repFst, 
+                    validLine $ rcsLineApply repLst] of 
                 [True, True] -> line
                 [False, True] -> dotRep [two] line
-                [True, False] -> reverse $ dotRep [two] (reverse line)
+                [True, False] -> dotRep ['.', '.', two] line
                 otherwise -> line 
         otherwise -> line
     where
         one = if 2*((length $ filter ((==) 'X') line) + 1) == length line
                     then 'X' else 'O'
         two = opo one
-        repFst = dotRep [one] line
-        repLst = reverse $ dotRep [one] (reverse line)  
-
+        repFst = dotRep [one, '.', '.'] line
+        repLst = dotRep ['.', '.', one] line
+        validLine = \line -> noTriInline line && halfSymbol line
 
 -- rule 4: complete line
 rule4 :: [Char] -> [Char]
@@ -186,7 +188,9 @@ checkDup (line:lines) board newBoard =
                 then xoRep else line
 
 -- rule A2: avoid potential duplicate row/column
-
+-- avoidPotentialDup :: [[Char]] -> [[Char]]
+-- avoidPotentialDup rowBoard = 
+--     where 
 
 -- replace '.' with a list of symbols
 dotRep [] ss = ss
