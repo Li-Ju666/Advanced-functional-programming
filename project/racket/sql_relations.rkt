@@ -39,12 +39,33 @@
 
 
 (define-syntax SELECT
-  (syntax-rules (FROM WHERE)
+  (syntax-rules (FROM WHERE AND OR)
     [(SELECT cols FROM table)
      (pickCols (getColIndices 'cols table) (set->list (second table)))]
-;    [(SELECT cols FROM table WHERE conditions)
-;     (pickCols (first table) '???)]
+    [(SELECT cols FROM table WHERE condition1 ...)
+     (let ((result (getRecords
+                    (if (eq? 1 (length (list 'condition1 ...)))
+                        (first (list 'condition1 ...)) (list 'condition1 ...))
+                    ; (list 'condition1 ...)
+                    table)))
+       pickCols (getColIndices 'cols table) (set->list result))]
+       ;#t)]
 ))
+
+(define (getRecords condition table)
+  (let ((target (index-of (map first (first table)) (first condition))))
+    (list->set
+     (filter (lambda (record)
+              (cond
+                [(eq? (second condition) '=)
+                 (eq? (list-ref record target) (third condition))]
+                [(eq? (second condition) '!=)
+                 (not (eq? (list-ref record target) (third condition)))]
+                [else
+                 ((eval (second condition)) (list-ref record target) (third condition))]
+                ))
+            (set->list (second table))))))
+
 
 (define (getColIndices cols table)
   (cond [(eq? cols '*) (range 0 (length (first table)) 1)]
@@ -53,6 +74,12 @@
 
 (define (pickCols indices records)
   (map (lambda (record) (map (lambda (index) (list-ref record index)) indices)) records))
+
+
+
+(define-syntax ADD
+  (syntax-rules (MIN)
+    [(ADD a MIN b ...) '(b ...)]))
 
 
 ;; TEST
@@ -91,3 +118,4 @@
 (SELECT (emp_name salary department) FROM employees)
 (SELECT emp_name FROM employees)
 (SELECT * FROM employees)
+(SELECT (emp_name) FROM employees)
